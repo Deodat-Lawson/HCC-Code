@@ -1,0 +1,240 @@
+Sub Combine()
+    Dim regenceSheet As Worksheet
+    Dim cvsSheet As Worksheet
+    Dim destinationSheet As Worksheet
+    
+    Dim startRowRegence As Long
+    Dim lastRowRegence As Long
+    Dim startRowCVS As Long
+    Dim lastRowCVS As Long
+    Dim i As Long
+    Dim currentRow As Long
+    Dim startRowFinal As Long
+    Dim lastRowFinal As Long
+    Dim firstEmptyRow As Long
+
+    ' Declare the dictionary object using CreateObject
+    Dim dict As Object
+    ' Create a new dictionary
+    Set dict = CreateObject("Scripting.Dictionary")
+    
+    ' Add items to the dictionary
+    
+    
+    dict.Add "Member Name", "A"
+    dict.Add "FPA Plan", "C"
+    dict.Add "Total Paid", "E"
+    dict.Add "Member ID", "G"
+    dict.Add "Age", "I"
+    dict.Add "Member Relationship", "K"
+    dict.Add "Primary Diagnosis Level 1", "L"
+
+
+    ' replace "Regence" with the name of the Regence claim tab
+    Set regenceSheet = ThisWorkbook.Sheets("Regence")
+    ' replace "CVS" with the name of the CVS claim tab
+    Set cvsSheet = ThisWorkbook.Sheets("CVS")
+    ' replace "Final" with the name of the name of the tab that you want to store the combined claims in
+    Set destinationSheet = ThisWorkbook.Sheets("Combined")
+    
+    currentRow = 2
+    
+    
+    
+    firstEmptyRow = 15
+    Do While Not IsCellEmpty(regenceSheet.Cells(firstEmptyRow, "B"))
+        firstEmptyRow = firstEmptyRow + 1
+    Loop
+    
+    ' Please modify these values respectively
+    
+    ' startRowRegence should locate the row of the first claim in the Regence Tab (excluding titles)
+    startRowRegence = 15
+    ' lastRowRegence should locate the row of the last claim in the Regence Tab (excluding total)
+    lastRowRegence = firstEmptyRow - 1
+    ' startRowCVS should locate the row of the first claim in the CVS Tab (excluding titles)
+    startRowCVS = 4
+    ' lastRowCVS should locate the row of the last claim in the CVS Tab (excluding total)
+    lastRowCVS = cvsSheet.Cells(cvsSheet.Rows.Count, "A").End(xlUp).Row
+    
+    
+    ' This block of code populates the title values
+    destinationSheet.Range("A1").Value = "Name"
+    destinationSheet.Range("B1").Value = "CVS Plan"
+    destinationSheet.Range("C1").Value = "Regence Plan"
+    destinationSheet.Range("D1").Value = "CVS"
+    destinationSheet.Range("E1").Value = "Regence"
+    destinationSheet.Range("F1").Value = "Total"
+    destinationSheet.Range("G1").Value = "Member ID (If Both Plans are avaliable, we are using the CVS Member ID)"
+    destinationSheet.Range("I1").Value = "Age"
+    destinationSheet.Range("J1").Value = "Gender"
+    destinationSheet.Range("K1").Value = "Relation"
+    destinationSheet.Range("L1").Value = "Diagnosis"
+    
+    
+    ' This block of code populates all the regence claims to the combined claims sheet
+    For i = startRowRegence To lastRowRegence
+        For j = 1 To 50
+            If dict.Exists(regenceSheet.Cells(14, j).Value) Then
+                destinationSheet.Cells(currentRow, dict(regenceSheet.Cells(14, j).Value)) = regenceSheet.Cells(i, j)
+            End If
+        Next j
+        destinationSheet.Cells(currentRow, "B") = 0
+        destinationSheet.Cells(currentRow, "D") = 0
+        destinationSheet.Cells(currentRow, "F") = destinationSheet.Cells(currentRow, "E")
+        destinationSheet.Rows(currentRow).Interior.Color = xlNone
+        currentRow = currentRow + 1
+    Next i
+    
+    dict.RemoveAll
+            
+    dict.Add "Member Full Name", "A"
+    dict.Add "FPA Plan", "B"
+    dict.Add "Total Net Cost", "D"
+    dict.Add "Claimant Account ID", "G"
+    dict.Add "Claimant Age", "I"
+    dict.Add "Claimant Gender", "J"
+    dict.Add "Relationship", "K"
+        
+    ' This block of code populates all the CVS claims to the combined claims sheet
+    For i = startRowCVS To lastRowCVS
+        For j = 1 To 50
+            If dict.Exists(cvsSheet.Cells(3, j).Value) Then
+                destinationSheet.Cells(currentRow, dict(cvsSheet.Cells(3, j).Value)) = cvsSheet.Cells(i, j)
+            End If
+        Next j
+        
+        destinationSheet.Cells(currentRow, "C") = 0
+        destinationSheet.Cells(currentRow, "E") = 0
+        destinationSheet.Cells(currentRow, "F") = destinationSheet.Cells(currentRow, "D")
+
+        destinationSheet.Rows(currentRow).Interior.Color = xlNone
+        
+        currentRow = currentRow + 1
+    Next i
+    
+    
+    ' Starting row in the destination sheet (going to be 2 as row 1 contains all the titles
+    startRowFinal = 2
+    
+    ' Last row in the destination sheet
+    With destinationSheet
+        lastRowFinal = .Cells(.Rows.Count, "A").End(xlUp).Row
+    End With
+    
+    ' Used for debugging purposes
+    ' MsgBox "The last populated row in the sheet is: " & lastRow
+    
+    ' This block runs through all the cells in the destination sheet, checks for multiple claims made by the same person, and combines them
+    ' Note the unique identifier used here is their member ID. We can easily change that
+    For i = startRowFinal To lastRowFinal
+        For j = i + 1 To lastRowFinal
+        
+            ' To change the unique identifier to full name instead of member ID, replace the If state with the line below
+            ' If destinationSheet.Cells(i, "A").Value = destinationSheet.Cells(j, "A").Value Then
+            On Error Resume Next
+            ' Attempt to convert to a number
+            destinationSheet.Cells(j, "G").Value = CDbl(destinationSheet.Cells(j, "G").Value)
+            destinationSheet.Cells(i, "G").Value = CDbl(destinationSheet.Cells(i, "G").Value)
+            ' On Error Resume Next
+            ' destinationSheet.Cells(j, "G").Value = CDbl(destinationSheet.Cells(j, "G").Value)
+            ' IsNumeric(destinationSheet.Cells(i, "G").Value) And IsNumeric(destinationSheet.Cells(j, "G").Value) And
+            
+            If destinationSheet.Cells(i, "A").Value = destinationSheet.Cells(j, "A").Value Then
+                If Abs(CInt(destinationSheet.Cells(j, "G").Value) - CInt(destinationSheet.Cells(i, "G").Value)) <= 2 Then
+                    Dim valAR As Double
+                    Dim valBR As Double
+                    Dim valAC As Double
+                    Dim valBC As Double
+                    
+                    valAR = CDbl(destinationSheet.Cells(i, "D").Value)
+                    valBR = CDbl(destinationSheet.Cells(j, "D").Value)
+                    valAR = valAR + valBR
+                    
+                    valAC = CDbl(destinationSheet.Cells(i, "E").Value)
+                    valBC = CDbl(destinationSheet.Cells(j, "E").Value)
+                    valAC = valAC + valBC
+                    
+    
+                    
+                    destinationSheet.Cells(i, "E") = valAC
+                    destinationSheet.Cells(i, "D") = valAR
+                    destinationSheet.Cells(i, "F") = valAR + valAC
+                    
+                    
+                    
+                    If destinationSheet.Cells(i, "C") = 0 Then
+                       destinationSheet.Cells(i, "C") = destinationSheet.Cells(j, "C")
+                    End If
+                    
+                    If destinationSheet.Cells(i, "B") = 0 Then
+                       destinationSheet.Cells(i, "B") = destinationSheet.Cells(j, "B")
+                    End If
+                    
+                    If Left(destinationSheet.Cells(i, "G"), 1) <> "Y" Then
+                       destinationSheet.Cells(i, "G") = destinationSheet.Cells(j, "G")
+                    End If
+                    
+                    If IsCellEmpty(destinationSheet.Cells(i, "J")) Then
+                       destinationSheet.Cells(i, "J") = destinationSheet.Cells(j, "J")
+                    End If
+                    ' Used for debugging purposes
+                    
+                    ' MsgBox "The current j is : " & j
+                    ' MsgBox "We combined rows : " & i & ", " & j
+                    ' destinationSheet.Rows(i).Interior.Color = RGB(255, 255, 0)
+                    ' destinationSheet.Rows(j).Interior.Color = RGB(255, 255, 0)
+                    
+                    destinationSheet.Rows(j).Delete Shift:=xlUp
+                    j = j - 1
+                    lastRowFinal = lastRowFinal - 1
+                End If
+            Else
+                ' MsgBox "RE"
+            End If
+        Next j
+    Next i
+    
+  ' MsgBox "All Duplicate Rows are Highlighted"
+        
+    
+    Dim sortRange As Range
+    Dim keyRange As Range
+    Dim lastRow As Long
+    
+    lastRow = destinationSheet.Cells(destinationSheet.Rows.Count, 6).End(xlUp).Row
+
+    Set sortRange = destinationSheet.Range("A2:L" & lastRow)
+ 
+    Set keyRange = destinationSheet.Range("F2:F" & destinationSheet.Cells(destinationSheet.Rows.Count, 6).End(xlUp).Row)
+    
+    With destinationSheet.Sort
+        .SortFields.Clear
+        .SortFields.Add Key:=keyRange, Order:=xlDescending
+        .SetRange sortRange
+        .Header = xlNo
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    
+    
+    
+
+    For Each col In destinationSheet.Range("A:L").Columns
+        col.EntireColumn.AutoFit
+    Next col
+    
+
+    
+End Sub
+
+Function IsCellEmpty(cell As Range) As Boolean
+    ' Check if a cell is empty, contains only spaces, or has a background color
+    IsCellEmpty = False
+    
+    If IsEmpty(cell.Value) Or Trim(cell.Value) = "" Then
+        IsCellEmpty = True
+    End If
+End Function
